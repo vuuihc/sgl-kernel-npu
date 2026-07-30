@@ -92,6 +92,9 @@ void catlass_matmul_basic(const at::Tensor &tensor_a,
 at::Tensor apply_token_bitmask(at::Tensor logits, at::Tensor bitmask,
                                c10::optional<at::Tensor> indices);
 
+at::Tensor apply_token_bitmask_legacy(at::Tensor logits, at::Tensor bitmask,
+                                      c10::optional<at::Tensor> indices);
+
 } // namespace npu_kernel
 
 } // namespace sglang

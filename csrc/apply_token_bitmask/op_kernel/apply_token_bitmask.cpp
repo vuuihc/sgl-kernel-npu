@@ -29,6 +29,7 @@ public:
         this->bitmaskStride = bitmaskStride;
         this->tileLength = tileLength;
         this->dtypeSize = dtypeSize;
+        this->blockDim = blockDim;
 
         // Evenly distribute rows: first extraCores cores get baseRows+1, rest get baseRows
         uint32_t blockIdx = AscendC::GetBlockIdx();
@@ -73,6 +74,24 @@ public:
                 Compute(curTileLen);
                 CopyOut(batchId, offset, curTileLen);
             }
+        }
+    }
+
+    __aicore__ inline void ProcessTiles()
+    {
+        uint32_t numTiles = (this->vocabSize + this->tileLength - 1) / this->tileLength;
+        uint32_t totalTiles = this->numRows * numTiles;
+        for (uint32_t workIdx = AscendC::GetBlockIdx(); workIdx < totalTiles; workIdx += this->blockDim) {
+            uint32_t batchId = workIdx / numTiles;
+            uint32_t tileIdx = workIdx % numTiles;
+            uint32_t offset = tileIdx * this->tileLength;
+            uint32_t curTileLen = this->tileLength;
+            if (offset + curTileLen > this->vocabSize) {
+                curTileLen = this->vocabSize - offset;
+            }
+            CopyIn(batchId, offset, curTileLen);
+            Compute(curTileLen);
+            CopyOut(batchId, offset, curTileLen);
         }
     }
 
@@ -148,6 +167,7 @@ private:
     uint32_t bitmaskStride;
     uint32_t tileLength;
     uint32_t dtypeSize;
+    uint32_t blockDim;
     uint32_t startRow;
     uint32_t localRows;
 };
@@ -161,7 +181,7 @@ extern "C" __global__ __aicore__ void apply_token_bitmask_fp16(GM_ADDR logits, G
     KernelApplyTokenBitmask<half> op;
     op.Init(logits, bitmask, numRows, vocabSize, logitsStride, bitmaskStride, baseRows, extraCores, tileLength,
             blockDim, dtypeSize);
-    op.Process();
+    op.ProcessTiles();
 }
 
 extern "C" __global__ __aicore__ void apply_token_bitmask_fp32(GM_ADDR logits, GM_ADDR bitmask, uint32_t numRows,
@@ -173,7 +193,7 @@ extern "C" __global__ __aicore__ void apply_token_bitmask_fp32(GM_ADDR logits, G
     KernelApplyTokenBitmask<float> op;
     op.Init(logits, bitmask, numRows, vocabSize, logitsStride, bitmaskStride, baseRows, extraCores, tileLength,
             blockDim, dtypeSize);
-    op.Process();
+    op.ProcessTiles();
 }
 
 extern "C" __global__ __aicore__ void apply_token_bitmask_bf16(GM_ADDR logits, GM_ADDR bitmask, uint32_t numRows,
@@ -181,6 +201,42 @@ extern "C" __global__ __aicore__ void apply_token_bitmask_bf16(GM_ADDR logits, G
                                                                uint32_t bitmaskStride, uint32_t baseRows,
                                                                uint32_t extraCores, uint32_t tileLength,
                                                                uint32_t blockDim, uint32_t dtypeSize)
+{
+    KernelApplyTokenBitmask<bfloat16_t> op;
+    op.Init(logits, bitmask, numRows, vocabSize, logitsStride, bitmaskStride, baseRows, extraCores, tileLength,
+            blockDim, dtypeSize);
+    op.ProcessTiles();
+}
+
+extern "C" __global__ __aicore__ void apply_token_bitmask_legacy_fp16(GM_ADDR logits, GM_ADDR bitmask, uint32_t numRows,
+                                                                      uint32_t vocabSize, uint32_t logitsStride,
+                                                                      uint32_t bitmaskStride, uint32_t baseRows,
+                                                                      uint32_t extraCores, uint32_t tileLength,
+                                                                      uint32_t blockDim, uint32_t dtypeSize)
+{
+    KernelApplyTokenBitmask<half> op;
+    op.Init(logits, bitmask, numRows, vocabSize, logitsStride, bitmaskStride, baseRows, extraCores, tileLength,
+            blockDim, dtypeSize);
+    op.Process();
+}
+
+extern "C" __global__ __aicore__ void apply_token_bitmask_legacy_fp32(GM_ADDR logits, GM_ADDR bitmask, uint32_t numRows,
+                                                                      uint32_t vocabSize, uint32_t logitsStride,
+                                                                      uint32_t bitmaskStride, uint32_t baseRows,
+                                                                      uint32_t extraCores, uint32_t tileLength,
+                                                                      uint32_t blockDim, uint32_t dtypeSize)
+{
+    KernelApplyTokenBitmask<float> op;
+    op.Init(logits, bitmask, numRows, vocabSize, logitsStride, bitmaskStride, baseRows, extraCores, tileLength,
+            blockDim, dtypeSize);
+    op.Process();
+}
+
+extern "C" __global__ __aicore__ void apply_token_bitmask_legacy_bf16(GM_ADDR logits, GM_ADDR bitmask, uint32_t numRows,
+                                                                      uint32_t vocabSize, uint32_t logitsStride,
+                                                                      uint32_t bitmaskStride, uint32_t baseRows,
+                                                                      uint32_t extraCores, uint32_t tileLength,
+                                                                      uint32_t blockDim, uint32_t dtypeSize)
 {
     KernelApplyTokenBitmask<bfloat16_t> op;
     op.Init(logits, bitmask, numRows, vocabSize, logitsStride, bitmaskStride, baseRows, extraCores, tileLength,

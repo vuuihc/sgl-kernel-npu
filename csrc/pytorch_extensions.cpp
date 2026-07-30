@@ -88,6 +88,7 @@ TORCH_LIBRARY_FRAGMENT(npu, m)
 #endif
 
     m.def("apply_token_bitmask(Tensor logits, Tensor bitmask, Tensor? indices=None) -> Tensor");
+    m.def("apply_token_bitmask_legacy(Tensor logits, Tensor bitmask, Tensor? indices=None) -> Tensor");
 
     m.def(
         "causal_conv1d_update(Tensor x, Tensor weight, Tensor(a!) conv_state, "
@@ -136,6 +137,12 @@ TORCH_LIBRARY_IMPL(npu, PrivateUse1, m)
     m.impl("apply_token_bitmask", [](at::Tensor logits, at::Tensor bitmask, const c10::optional<at::Tensor> &indices) {
         auto indices_or_empty = indices.has_value() ? *indices : at::empty({0}, logits.options().dtype(at::kInt));
         return sglang::npu_kernel::apply_token_bitmask(logits, bitmask, indices_or_empty);
+    });
+
+    m.impl("apply_token_bitmask_legacy", [](at::Tensor logits, at::Tensor bitmask,
+                                            const c10::optional<at::Tensor> &indices) {
+        auto indices_or_empty = indices.has_value() ? *indices : at::empty({0}, logits.options().dtype(at::kInt));
+        return sglang::npu_kernel::apply_token_bitmask_legacy(logits, bitmask, indices_or_empty);
     });
 
     m.impl("causal_conv1d_update",
