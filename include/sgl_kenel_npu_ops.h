@@ -173,6 +173,9 @@ at::Tensor softfp8_w8a16_matmul(const at::Tensor &mat1, const at::Tensor &mat2,
 #endif
 #endif
 
+at::Tensor apply_token_bitmask_legacy(at::Tensor logits, at::Tensor bitmask,
+                                      c10::optional<at::Tensor> indices);
+
 } // namespace npu_kernel
 
 } // namespace sglang

@@ -18,7 +18,6 @@
 import argparse
 import math
 import sys
-import time
 import unittest
 
 import sgl_kernel_npu
@@ -281,6 +280,39 @@ class TestApplyTokenBitmaskFunction(unittest.TestCase):
 
             torch.testing.assert_close(out1, out2, atol=0.0, rtol=0.0)
 
+    @torch.no_grad()
+    def test_optimized_matches_legacy(self):
+        """The optimized tile partition must preserve legacy results."""
+        cases = [
+            (1, 32000, "random", None),
+            (1, 151936, "random", None),
+            (2, 32100, "half_masked", None),
+            (8, 32000, "all_unmasked", None),
+            (8, 32000, "random", torch.tensor([0, 2, 5, 7], dtype=torch.int32)),
+        ]
+        for dtype in SUPPORTED_DTYPES:
+            for batch, vocab, mode, indices in cases:
+                with self.subTest(
+                    dtype=dtype,
+                    batch=batch,
+                    vocab=vocab,
+                    mode=mode,
+                    indices=indices is not None,
+                ):
+                    logits = torch.randn(batch, vocab, dtype=dtype, device="npu")
+                    bitmask = make_bitmask(batch, vocab, mode).npu()
+                    indices_npu = indices.npu() if indices is not None else None
+
+                    optimized = torch.ops.npu.apply_token_bitmask(
+                        logits.clone(), bitmask, indices_npu
+                    )
+                    legacy = torch.ops.npu.apply_token_bitmask_legacy(
+                        logits.clone(), bitmask, indices_npu
+                    )
+                    torch.testing.assert_close(
+                        optimized.float(), legacy.float(), atol=0.0, rtol=0.0
+                    )
+
 
 # ---------------------------------------------------------------------------
 # Performance tests
@@ -288,7 +320,7 @@ class TestApplyTokenBitmaskFunction(unittest.TestCase):
 
 
 def run_perf_test(batch, vocab, dtype, warmup=5, iters=50, indices=None):
-    """Benchmark apply_token_bitmask, return avg latency in ms."""
+    """Benchmark apply_token_bitmask with NPU events, returning mean latency in ms."""
     bitmask = make_bitmask(batch, vocab, "random")
 
     logits_npu = torch.randn(batch, vocab, dtype=dtype, device="npu").contiguous()
@@ -303,16 +335,19 @@ def run_perf_test(batch, vocab, dtype, warmup=5, iters=50, indices=None):
             torch.ops.npu.apply_token_bitmask(logits_npu, bitmask_npu)
     torch.npu.synchronize()
 
-    # Benchmark
-    start = time.perf_counter()
+    event_pairs = []
     for _ in range(iters):
+        start = torch.npu.Event(enable_timing=True)
+        end = torch.npu.Event(enable_timing=True)
+        start.record()
         if indices_npu is not None:
             torch.ops.npu.apply_token_bitmask(logits_npu, bitmask_npu, indices_npu)
         else:
             torch.ops.npu.apply_token_bitmask(logits_npu, bitmask_npu)
+        end.record()
+        event_pairs.append((start, end))
     torch.npu.synchronize()
-    elapsed = (time.perf_counter() - start) / iters * 1000  # ms
-    return elapsed
+    return sum(start.elapsed_time(end) for start, end in event_pairs) / iters
 
 
 def perf_suite():
@@ -334,19 +369,17 @@ def perf_suite():
 
     print(
         f"\n{'Config':<20s} {'Batch':>5s} {'Vocab':>7s} {'Dtype':>8s} "
-        f"{'Latency(ms)':>12s} {'Bandwidth(GB/s)':>16s}"
+        f"{'Latency(ms)':>12s}"
     )
     print("-" * 80)
 
     for label, batch, vocab, dtype in configs:
         try:
             latency = run_perf_test(batch, vocab, dtype)
-            total_bytes = batch * vocab * 4 * 2  # approx: read logits + mask
-            bw = total_bytes / (latency * 1e-3) / 1e9 if latency > 0 else 0
             dtype_str = str(dtype).replace("torch.", "")
             print(
                 f"{label:<20s} {batch:>5d} {vocab:>7d} {dtype_str:>8s} "
-                f"{latency:>12.3f} {bw:>16.2f}"
+                f"{latency:>12.3f}"
             )
         except Exception as e:
             print(f"{label:<20s} {batch:>5d} {vocab:>7d} {'ERROR':>8s} {str(e):>12s}")
@@ -403,24 +436,13 @@ if __name__ == "__main__":
             "test_single_row",
             "test_with_indices",
             "test_indices_all_rows",
+            "test_optimized_matches_legacy",
         ]:
-            suite.addTests(
-                loader.loadTestsFromName(
-                    f"test_apply_token_bitmask_sgl.TestApplyTokenBitmaskFunction.{name}"
-                )
-            )
+            suite.addTest(TestApplyTokenBitmaskFunction(name))
     elif args.category == "llm":
-        suite.addTests(
-            loader.loadTestsFromName(
-                "test_apply_token_bitmask_sgl.TestApplyTokenBitmaskFunction.test_llm_shapes"
-            )
-        )
+        suite.addTest(TestApplyTokenBitmaskFunction("test_llm_shapes"))
     elif args.category == "general":
-        suite.addTests(
-            loader.loadTestsFromName(
-                "test_apply_token_bitmask_sgl.TestApplyTokenBitmaskFunction.test_general_shapes"
-            )
-        )
+        suite.addTest(TestApplyTokenBitmaskFunction("test_general_shapes"))
     else:
         suite.addTests(loader.loadTestsFromTestCase(TestApplyTokenBitmaskFunction))
 
@@ -433,3 +455,5 @@ if __name__ == "__main__":
         print(f"{'='*60}")
     else:
         print(f"\n{len(result.failures)} failures, {len(result.errors)} errors")
+
+    sys.exit(0 if result.wasSuccessful() else 1)
