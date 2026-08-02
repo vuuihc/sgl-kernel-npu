@@ -1,0 +1,55 @@
+[W802 20:38:47.638176399 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+test_all_masked (__main__.TestApplyTokenBitmaskFunction.test_all_masked)
+All bits = 0: every logit becomes -inf. ... [W802 20:38:50.021755168 NPUCachingAllocator.cpp:198] Warning: The current CANN and Soc Version require processing for 32 padding size, with memory allocation. (function operator())
+ok
+test_all_unmasked (__main__.TestApplyTokenBitmaskFunction.test_all_unmasked)
+All bits = 1: logits unchanged. ... ok
+test_half_masked (__main__.TestApplyTokenBitmaskFunction.test_half_masked)
+Alternating 0x55555555 / 0xAAAAAAAA pattern. ... ok
+test_single_row (__main__.TestApplyTokenBitmaskFunction.test_single_row)
+batch=1 edge case. ... ok
+test_with_indices (__main__.TestApplyTokenBitmaskFunction.test_with_indices)
+Optional indices: only specified rows are modified. ... ok
+test_indices_all_rows (__main__.TestApplyTokenBitmaskFunction.test_indices_all_rows)
+indices covering all rows == no indices. ... ok
+test_optimized_matches_legacy (__main__.TestApplyTokenBitmaskFunction.test_optimized_matches_legacy)
+The optimized tile partition must preserve legacy results. ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.745s
+
+OK
+
+============================================================
+ALL 7 TESTS PASSED
+============================================================
+[W802 20:38:55.602598895 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+test_llm_shapes (__main__.TestApplyTokenBitmaskFunction.test_llm_shapes)
+LLM inference typical shapes x 3 dtypes = 21 cases. ... [W802 20:38:58.055465208 NPUCachingAllocator.cpp:198] Warning: The current CANN and Soc Version require processing for 32 padding size, with memory allocation. (function operator())
+
+  LLM shapes: 21/21 passed
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 5.432s
+
+OK
+
+============================================================
+ALL 1 TESTS PASSED
+============================================================
+[W802 20:39:07.531194825 FunctionLoader.cpp:48] Warning: LD_PRELOAD detected, FunctionLoader prefers RTLD_DEFAULT for symbol resolution. (function operator())
+test_general_shapes (__main__.TestApplyTokenBitmaskFunction.test_general_shapes)
+Boundary and non-aligned shapes x 3 dtypes = 21 cases. ... [W802 20:39:10.842543712 NPUCachingAllocator.cpp:198] Warning: The current CANN and Soc Version require processing for 32 padding size, with memory allocation. (function operator())
+
+  General shapes: 21/21 passed
+ok
+
+----------------------------------------------------------------------
+Ran 1 test in 6.090s
+
+OK
+
+============================================================
+ALL 1 TESTS PASSED
+============================================================
