@@ -2,6 +2,10 @@
 
 We recommend new contributors start from writing documentation, which helps you quickly understand codebase.
 
+## Optimization Roadmaps
+
+- [单机单卡 Ascend 950 性能优化贡献路线](developer_guide/ascend950_single_card_optimization_roadmap.md)
+
 ## Docs Workflow
 
 ### Update Documentation
