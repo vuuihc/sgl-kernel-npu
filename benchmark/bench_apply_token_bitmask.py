@@ -76,7 +76,7 @@ def _metadata(args):
     return {
         "timestamp_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "git_commit": _run(["git", "rev-parse", "HEAD"]),
-        "git_status": _run(["git", "status", "--short"]),
+        "git_status": _run(["git", "status", "--short", "--untracked-files=no"]),
         "python": sys.version,
         "platform": platform.platform(),
         "torch": str(torch.__version__),
