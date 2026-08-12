@@ -30,6 +30,7 @@ if [[ ${#wheels[@]} -ne 1 ]]; then
     exit 1
 fi
 python3 -m pip install --force-reinstall --no-deps "${wheels[0]}"
+rm -f "${ROOT_DIR}/python/sgl_kernel_npu/sgl_kernel_npu/config.ini"
 
 mkdir -p "${RESULT_DIR}"
 echo "Capturing hardware and software metadata..."
@@ -51,7 +52,9 @@ python3 benchmark/bench_apply_token_bitmask.py \
     --markdown-output "${RESULT_DIR}/results.md"
 
 git rev-parse HEAD >"${RESULT_DIR}/commit.txt"
-git status --short >"${RESULT_DIR}/git-status.txt"
+git diff --quiet
+git diff --cached --quiet
+git status --short --untracked-files=no >"${RESULT_DIR}/git-status.txt"
 printf 'soc_version=%s\nsuite=%s\n' "${SOC_VERSION}" "${SUITE}" \
     >"${RESULT_DIR}/runner-config.txt"
 
