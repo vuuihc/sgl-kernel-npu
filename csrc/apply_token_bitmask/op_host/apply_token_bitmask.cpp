@@ -92,15 +92,7 @@ HOST_API at::Tensor apply_token_bitmask(at::Tensor logits, at::Tensor bitmask, c
     int64_t dtypeSize = static_cast<int64_t>(workingLogits.element_size());
 
     auto ascendcPlatform = platform_ascendc::PlatformAscendCManager::GetInstance();
-    int64_t coreNum = ascendcPlatform->GetCoreNumAiv();
-
-    // Block dimension: one block per row, capped at coreNum
-    uint32_t blockDim = static_cast<uint32_t>(std::min(static_cast<int64_t>(numIndices), coreNum));
-    if (blockDim == 0) blockDim = 1;
-
-    // Evenly distribute rows: first (numIndices % blockDim) cores get one extra row
-    uint32_t baseRows = static_cast<uint32_t>(numIndices) / blockDim;
-    uint32_t extraCores = static_cast<uint32_t>(numIndices) % blockDim;
+    int64_t coreNum = std::max<int64_t>(ascendcPlatform->GetCoreNumAiv(), 1);
 
     // Compute tileLength from UB size
     // UB per tile (double buffered, BUFFER_NUM=2):
@@ -117,18 +109,29 @@ HOST_API at::Tensor apply_token_bitmask(at::Tensor logits, at::Tensor bitmask, c
 
     int64_t bytesPerUnit = static_cast<int64_t>(hostBufferNum) *
                            (2 * ALIGN_UNIT * dtypeSize + (ALIGN_UNIT / 32) * static_cast<int64_t>(sizeof(int32_t)));
-    uint32_t tileLength =
+    uint32_t maxTileLength =
         static_cast<uint32_t>((usableUb / static_cast<uint64_t>(bytesPerUnit)) * static_cast<uint64_t>(ALIGN_UNIT));
 
-    // Cap tileLength to paddedVocabSize
-    if (tileLength > static_cast<uint32_t>(paddedVocabSize)) {
-        tileLength = static_cast<uint32_t>(paddedVocabSize);
+    // Cap maxTileLength to paddedVocabSize
+    if (maxTileLength > static_cast<uint32_t>(paddedVocabSize)) {
+        maxTileLength = static_cast<uint32_t>(paddedVocabSize);
     }
 
     // Safety floor
-    if (tileLength < static_cast<uint32_t>(ALIGN_UNIT)) {
-        tileLength = static_cast<uint32_t>(ALIGN_UNIT);
+    if (maxTileLength < static_cast<uint32_t>(ALIGN_UNIT)) {
+        maxTileLength = static_cast<uint32_t>(ALIGN_UNIT);
     }
+
+    // Split each row into enough aligned tiles to expose parallel work across
+    // the available AIVs, without exceeding the UB-derived maximum tile size.
+    int64_t tilesPerRow = std::min<int64_t>((coreNum + numIndices - 1) / numIndices, coreNum);
+    int64_t targetTileLength =
+        ((paddedVocabSize + tilesPerRow - 1) / tilesPerRow + ALIGN_UNIT - 1) / ALIGN_UNIT * ALIGN_UNIT;
+    uint32_t tileLength = static_cast<uint32_t>(std::min<int64_t>(maxTileLength, targetTileLength));
+
+    int64_t numTiles = (paddedVocabSize + tileLength - 1) / tileLength;
+    int64_t totalTiles = numIndices * numTiles;
+    uint32_t blockDim = static_cast<uint32_t>(std::min<int64_t>(totalTiles, coreNum));
 
     // Prevent NPU storage from being reclaimed before async kernel completes
     auto npuStream = c10_npu::getCurrentNPUStream();
@@ -145,13 +148,13 @@ HOST_API at::Tensor apply_token_bitmask(at::Tensor logits, at::Tensor bitmask, c
     // Launch kernel
     if (dtype == at::kFloat) {
         EXEC_KERNEL_CMD(apply_token_bitmask_fp32, blockDim, workingLogits, workingBitmask, numRowsU32, vocabSizeU32,
-                        logitsStrideU32, bitmaskStrideU32, baseRows, extraCores, tileLength, blockDim, dtypeSizeU32);
+                        logitsStrideU32, bitmaskStrideU32, tileLength, blockDim, dtypeSizeU32);
     } else if (dtype == at::kHalf) {
         EXEC_KERNEL_CMD(apply_token_bitmask_fp16, blockDim, workingLogits, workingBitmask, numRowsU32, vocabSizeU32,
-                        logitsStrideU32, bitmaskStrideU32, baseRows, extraCores, tileLength, blockDim, dtypeSizeU32);
+                        logitsStrideU32, bitmaskStrideU32, tileLength, blockDim, dtypeSizeU32);
     } else {
         EXEC_KERNEL_CMD(apply_token_bitmask_bf16, blockDim, workingLogits, workingBitmask, numRowsU32, vocabSizeU32,
-                        logitsStrideU32, bitmaskStrideU32, baseRows, extraCores, tileLength, blockDim, dtypeSizeU32);
+                        logitsStrideU32, bitmaskStrideU32, tileLength, blockDim, dtypeSizeU32);
     }
 
     // Copy results back
