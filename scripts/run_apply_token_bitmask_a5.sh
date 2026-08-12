@@ -4,7 +4,8 @@ set -euo pipefail
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
 SUITE=${1:-full}
-RESULT_DIR=${2:-"${ROOT_DIR}/benchmark/results/apply_token_bitmask/${TIMESTAMP}"}
+SOC_VERSION=${SOC_VERSION:-Ascend950PR_9599}
+RESULT_DIR=${2:-"${ROOT_DIR}/benchmark/results/apply_token_bitmask_a5/${TIMESTAMP}"}
 
 if [[ "${SUITE}" != "quick" && "${SUITE}" != "full" ]]; then
     echo "Usage: $0 [quick|full] [result-directory]" >&2
@@ -13,8 +14,14 @@ fi
 
 cd "${ROOT_DIR}"
 
-echo "Building sgl_kernel_npu for Ascend 950..."
-bash build.sh -a kernels Ascend950
+if [[ -n "$(git status --porcelain)" ]]; then
+    echo "Refusing to benchmark a dirty worktree:" >&2
+    git status --short >&2
+    exit 1
+fi
+
+echo "Building sgl_kernel_npu for ${SOC_VERSION}..."
+bash build.sh -a kernels "${SOC_VERSION}"
 
 shopt -s nullglob
 wheels=(output/sgl_kernel_npu*.whl)
@@ -25,6 +32,9 @@ fi
 python3 -m pip install --force-reinstall --no-deps "${wheels[0]}"
 
 mkdir -p "${RESULT_DIR}"
+echo "Capturing hardware and software metadata..."
+bash scripts/capture_npu_hardware.sh "${RESULT_DIR}"
+
 echo "Running functional regression tests..."
 {
     python3 tests/python/sgl_kernel_npu/test_apply_token_bitmask.py --category boundary
@@ -42,6 +52,8 @@ python3 benchmark/bench_apply_token_bitmask.py \
 
 git rev-parse HEAD >"${RESULT_DIR}/commit.txt"
 git status --short >"${RESULT_DIR}/git-status.txt"
+printf 'soc_version=%s\nsuite=%s\n' "${SOC_VERSION}" "${SUITE}" \
+    >"${RESULT_DIR}/runner-config.txt"
 
 echo
 echo "Results are ready in ${RESULT_DIR}"
