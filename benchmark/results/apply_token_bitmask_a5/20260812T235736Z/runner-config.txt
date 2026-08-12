@@ -1,0 +1,2 @@
+soc_version=Ascend950PR_9599
+suite=full

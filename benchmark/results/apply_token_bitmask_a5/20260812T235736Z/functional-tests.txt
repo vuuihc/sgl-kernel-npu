@@ -1,0 +1,49 @@
+test_all_masked (__main__.TestApplyTokenBitmaskFunction.test_all_masked)
+All bits = 0: every logit becomes -inf. ... ok
+test_all_unmasked (__main__.TestApplyTokenBitmaskFunction.test_all_unmasked)
+All bits = 1: logits unchanged. ... ok
+test_half_masked (__main__.TestApplyTokenBitmaskFunction.test_half_masked)
+Alternating 0x55555555 / 0xAAAAAAAA pattern. ... ok
+test_single_row (__main__.TestApplyTokenBitmaskFunction.test_single_row)
+batch=1 edge case. ... ok
+test_with_indices (__main__.TestApplyTokenBitmaskFunction.test_with_indices)
+Optional indices: only specified rows are modified. ... ok
+test_indices_all_rows (__main__.TestApplyTokenBitmaskFunction.test_indices_all_rows)
+indices covering all rows == no indices. ... ok
+test_optimized_matches_legacy (__main__.TestApplyTokenBitmaskFunction.test_optimized_matches_legacy)
+The optimized tile partition must preserve legacy results. ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.954s
+
+OK
+
+============================================================
+ALL 7 TESTS PASSED
+============================================================
+test_llm_shapes (__main__.TestApplyTokenBitmaskFunction.test_llm_shapes)
+LLM inference typical shapes x 3 dtypes = 21 cases. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 5.378s
+
+OK
+
+  LLM shapes: 21/21 passed
+
+============================================================
+ALL 1 TESTS PASSED
+============================================================
+test_general_shapes (__main__.TestApplyTokenBitmaskFunction.test_general_shapes)
+Boundary and non-aligned shapes x 3 dtypes = 21 cases. ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 6.236s
+
+OK
+
+  General shapes: 21/21 passed
+
+============================================================
+ALL 1 TESTS PASSED
+============================================================

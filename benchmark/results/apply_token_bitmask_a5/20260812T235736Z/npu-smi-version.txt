@@ -1,0 +1,22 @@
+$ npu-smi info -t health
+
+This command must input card id.
+
+Usage: npu-smi info <watch|proc|-h|-m|-l|-t type> [Options...]
+
+Commands:
+       watch          Show all device's status in scrolling format
+       proc           Show device's matrix process status in scrolling format
+       -h, --help     Show this help text and exit
+       -m             Show all device's mapping information
+       -l             Show all device's topology information
+       -t type        Show information for type
+                      type: board, common, flash, memory, usages, temp, power, volt, health,
+                            current-fault-event, ecc, ecc-enable, sensors, sys-time, key-manage,
+                            proc-mem, phyid-remap, topo, spod-info, sio-info, sys-log-info,
+                            tls-csr-get, tls-cert, tls-cert-period, pcie-err,
+                            custom-op-secverify-enable, custom-op-secverify-mode.
+
+Options:
+       -i %d          NPU ID
+       -p %d          Chip Physical ID

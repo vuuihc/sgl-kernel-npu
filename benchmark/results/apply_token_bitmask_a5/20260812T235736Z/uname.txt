@@ -1,0 +1,2 @@
+$ uname -a
+Linux 53a0ea98f88f 6.6.0-132.0.0.111.oe2403sp3.x86_64 #1 SMP Mon Dec 29 23:07:38 CST 2025 x86_64 x86_64 x86_64 GNU/Linux
